@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  *
  * <h2>Stockage du mot de passe</h2>
  * <p>Le mot de passe n'est jamais stocké en clair. Il est chiffré avec AES-GCM
- * via {@link CryptoService} avant persistance. Ce chiffrement réversible est
+ * via {@link com.example.authserver.service.CryptoService} avant persistance. Ce chiffrement réversible est
  * nécessaire pour recalculer le HMAC côté serveur lors du login.</p>
  *
  * <h2>Table</h2>
