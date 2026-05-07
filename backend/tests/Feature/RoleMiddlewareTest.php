@@ -98,9 +98,8 @@ class RoleMiddlewareTest extends TestCase
     {
         $apprenant = User::factory()->apprenant()->create();
         $formation = Formation::factory()->create();
-        $token = auth('api')->login($apprenant);
 
-        $response = $this->withHeader('Authorization', "Bearer {$token}")
+        $response = $this->withSpringAuth($apprenant->email, 'apprenant')
             ->postJson("/api/formations/{$formation->id}/inscription");
 
         $response->assertStatus(201);
