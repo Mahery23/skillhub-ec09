@@ -22,11 +22,13 @@ import java.util.UUID;
 /**
  * Service principal du microservice d'authentification forte (protocole HMAC).
  *
- * Flux :
- * 1. Client demande un nonce via GET /api/auth/challenge
- * 2. Client calcule HMAC(password, email:nonce:timestamp)
- * 3. Client envoie POST /api/auth/login sans jamais transmettre le mot de passe
- * 4. Serveur vérifie et émet un JWT
+ * <h2>Flux d'authentification</h2>
+ * <ol>
+ *   <li>Le client demande un nonce via {@code GET /api/auth/challenge}</li>
+ *   <li>Le client calcule {@code HMAC(password, email:nonce:timestamp)}</li>
+ *   <li>Le client envoie {@code POST /api/auth/login} sans transmettre le mot de passe</li>
+ *   <li>Le serveur vérifie le timestamp, le nonce (anti-rejeu) et le HMAC, puis émet un JWT</li>
+ * </ol>
  */
 @Service
 @RequiredArgsConstructor
@@ -45,8 +47,15 @@ public class AuthService {
     private long nonceTtlSeconds;
 
     /**
-     * Inscription d'un nouvel utilisateur.
-     * Le mot de passe est chiffré avec AES-GCM avant stockage.
+     * Inscrit un nouvel utilisateur en chiffrant son mot de passe avec AES-GCM.
+     *
+     * @param email    adresse email (identifiant unique)
+     * @param password mot de passe en clair — chiffré avant stockage
+     * @param name     nom complet de l'utilisateur
+     * @param role     rôle : {@code "apprenant"} ou {@code "formateur"}
+     * @throws CryptoException             si le chiffrement du mot de passe échoue
+     * @throws ResponseStatusException 409 si l'email est déjà utilisé
+     * @throws ResponseStatusException 400 si le rôle est invalide
      */
     @Transactional
     public void register(String email, String password, String name, String role) throws CryptoException {
@@ -65,15 +74,26 @@ public class AuthService {
     }
 
     /**
-     * Génère un nonce aléatoire pour le challenge HMAC.
+     * Génère un nonce UUID aléatoire pour initier le protocole HMAC.
+     *
+     * @param email l'email de l'utilisateur (non utilisé, conservé pour cohérence de l'API)
+     * @return un UUID sous forme de chaîne
      */
     public String generateChallenge(String email) {
         return UUID.randomUUID().toString();
     }
 
     /**
-     * Authentification forte HMAC en 7 étapes.
-     * Aucun mot de passe ne circule sur le réseau.
+     * Authentifie un utilisateur via le protocole HMAC en 7 étapes.
+     *
+     * <p>Le mot de passe ne circule jamais sur le réseau. Le serveur recalcule
+     * le HMAC à partir du mot de passe déchiffré et compare en temps constant
+     * pour résister aux timing attacks.</p>
+     *
+     * @param request payload contenant email, nonce, timestamp et hmac
+     * @return un {@link LoginResponse} contenant le JWT et son expiration
+     * @throws CryptoException         si le déchiffrement du mot de passe échoue
+     * @throws ResponseStatusException 401 si le timestamp, le nonce ou le HMAC est invalide
      */
     @Transactional
     public LoginResponse login(LoginRequest request) throws CryptoException {

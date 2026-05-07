@@ -12,9 +12,19 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * Service de chiffrement/déchiffrement AES-GCM.
- * La clé est injectée via la variable d'environnement APP_MASTER_KEY.
- * Si la clé est absente, l'application refuse de démarrer.
+ * Service de chiffrement/déchiffrement AES-GCM des mots de passe utilisateur.
+ *
+ * <h2>Algorithme</h2>
+ * <p>AES-256-GCM avec IV aléatoire de 12 octets et tag d'authentification de 128 bits.
+ * Chaque chiffrement produit un IV différent, rendant deux chiffrements du même
+ * mot de passe indiscernables.</p>
+ *
+ * <h2>Format de stockage</h2>
+ * <pre>v1:Base64(iv):Base64(ciphertext+tag)</pre>
+ *
+ * <h2>Clé</h2>
+ * <p>Dérivée des 32 premiers caractères de {@code APP_MASTER_KEY}.
+ * L'application refuse de démarrer si cette variable est absente ou trop courte.</p>
  */
 @Service
 public class CryptoService {
@@ -31,8 +41,10 @@ public class CryptoService {
     private SecretKeySpec secretKey;
 
     /**
-     * Vérifie que APP_MASTER_KEY est présente au démarrage.
-     * Refuse de démarrer si absente ou trop courte.
+     * Initialise la clé AES à partir de {@code APP_MASTER_KEY}.
+     * Appelé automatiquement par Spring au démarrage.
+     *
+     * @throws IllegalStateException si la clé est absente ou fait moins de 32 caractères
      */
     @PostConstruct
     public void init() {
@@ -50,8 +62,11 @@ public class CryptoService {
     }
 
     /**
-     * Chiffre un mot de passe.
-     * Format de sortie : v1:Base64(iv):Base64(ciphertext)
+     * Chiffre un mot de passe en clair avec AES-256-GCM.
+     *
+     * @param plainPassword le mot de passe en clair à chiffrer
+     * @return la valeur chiffrée au format {@code v1:Base64(iv):Base64(ciphertext)}
+     * @throws CryptoException si le chiffrement échoue
      */
     public String encrypt(String plainPassword) throws CryptoException {
         try {
@@ -75,7 +90,11 @@ public class CryptoService {
     }
 
     /**
-     * Déchiffre un mot de passe stocké au format v1:Base64(iv):Base64(ciphertext).
+     * Déchiffre un mot de passe stocké au format {@code v1:Base64(iv):Base64(ciphertext)}.
+     *
+     * @param encryptedValue la valeur chiffrée à déchiffrer
+     * @return le mot de passe en clair
+     * @throws CryptoException si le format est invalide, la clé incorrecte ou les données altérées
      */
     public String decrypt(String encryptedValue) throws CryptoException {
         try {

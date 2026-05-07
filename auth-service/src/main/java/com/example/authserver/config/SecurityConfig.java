@@ -18,10 +18,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Configuration de la sécurité Spring.
- * - API stateless (pas de session, pas de CSRF)
- * - JWT vérifié sur chaque requête protégée
- * - CORS ouvert pour permettre les appels depuis Laravel et React
+ * Configuration de la sécurité Spring pour l'API stateless.
+ *
+ * <ul>
+ *   <li>CSRF désactivé — inutile pour une API REST sans session</li>
+ *   <li>Sessions désactivées — chaque requête est autonome (JWT)</li>
+ *   <li>CORS ouvert — à restreindre aux domaines autorisés en production</li>
+ *   <li>Routes publiques : {@code /api/auth/**} et {@code /actuator/health}</li>
+ * </ul>
  */
 @Configuration
 @EnableWebSecurity
@@ -30,41 +34,39 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
 
+    /**
+     * Définit la chaîne de filtres de sécurité Spring.
+     *
+     * @param http le constructeur de configuration HTTP Spring Security
+     * @return la {@link SecurityFilterChain} configurée
+     * @throws Exception en cas d'erreur de configuration
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // Désactive CSRF (inutile pour une API REST stateless)
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // Active CORS avec notre configuration personnalisée
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // Pas de session HTTP — chaque requête est autonome
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // Retourne 401 si la requête n'est pas authentifiée
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
-
                 .authorizeHttpRequests(auth -> auth
-                        // Routes publiques : register, login, challenge
                         .requestMatchers("/api/auth/**").permitAll()
-                        // Health check Docker
                         .requestMatchers("/actuator/health").permitAll()
-                        // Tout le reste nécessite un JWT valide
                         .anyRequest().authenticated()
                 )
-
-                // Notre filtre JWT s'exécute avant le filtre d'auth Spring
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
     /**
-     * Configuration CORS : autorise les appels depuis n'importe quelle origine.
-     * En production, remplacer "*" par les domaines autorisés.
+     * Configure les règles CORS appliquées à toutes les routes.
+     *
+     * <p><strong>Attention :</strong> en production, remplacer {@code "*"} par
+     * les domaines autorisés (ex: {@code "https://skillhub.fr"}).</p>
+     *
+     * @return la source de configuration CORS
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

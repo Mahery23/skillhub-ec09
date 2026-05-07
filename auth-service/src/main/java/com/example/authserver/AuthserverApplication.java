@@ -28,6 +28,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  */
 @SpringBootApplication
 public class AuthserverApplication {
+
+    /**
+     * Lance l'application Spring Boot.
+     *
+     * @param args arguments de ligne de commande (non utilisés)
+     */
     public static void main(String[] args) {
         SpringApplication.run(AuthserverApplication.class, args);
     }

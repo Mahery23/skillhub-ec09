@@ -58,9 +58,17 @@ public class AuthNonce {
     @Column(nullable = false)
     private boolean consumed = false;
 
+    /** Date et heure de création du nonce (UTC). */
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    /**
+     * Construit un nouveau nonce pour un utilisateur donné.
+     *
+     * @param user      l'utilisateur auquel ce nonce est associé
+     * @param nonce     la valeur UUID du nonce
+     * @param expiresAt date/heure d'expiration du nonce
+     */
     public AuthNonce(User user, String nonce, LocalDateTime expiresAt) {
         this.user = user;
         this.nonce = nonce;

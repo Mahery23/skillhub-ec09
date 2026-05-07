@@ -4,15 +4,19 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
- * Réponse JSON du serveur en cas d'authentification réussie.
+ * Réponse JSON retournée après une authentification HMAC réussie.
+ *
+ * <p>Le client doit stocker le {@code accessToken} et l'inclure dans
+ * toutes ses requêtes protégées via le header
+ * {@code Authorization: Bearer <accessToken>}.</p>
  */
 @Data
 @AllArgsConstructor
 public class LoginResponse {
 
-    /** JWT access token à utiliser dans le header Authorization: Bearer {token}. */
+    /** JWT signé à transmettre dans le header {@code Authorization: Bearer <token>}. */
     private String accessToken;
 
-    /** Timestamp epoch (secondes) d'expiration du token. */
+    /** Timestamp epoch en secondes indiquant quand le token expire. */
     private long expiresAt;
 }

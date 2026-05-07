@@ -12,7 +12,16 @@ import java.util.Map;
 
 /**
  * Point d'entrée REST du microservice d'authentification forte.
- * Endpoints publics : /api/auth/register, /api/auth/challenge, /api/auth/login
+ *
+ * <h2>Endpoints exposés</h2>
+ * <ul>
+ *   <li>{@code POST /api/auth/register} — inscription d'un nouvel utilisateur</li>
+ *   <li>{@code GET  /api/auth/challenge} — obtention d'un nonce pour le login HMAC</li>
+ *   <li>{@code POST /api/auth/login}    — authentification HMAC et émission du JWT</li>
+ * </ul>
+ *
+ * <p>Tous ces endpoints sont publics (aucun JWT requis).
+ * Voir {@link com.example.authserver.config.SecurityConfig} pour la configuration.</p>
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -23,9 +32,11 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * Inscription d'un nouvel utilisateur.
-     * POST /api/auth/register
-     * Body: { email, password, name, role }
+     * Inscrit un nouvel utilisateur dans le système.
+     *
+     * @param body JSON contenant {@code email}, {@code password}, {@code name}, {@code role}
+     * @return 200 avec un message de confirmation, 409 si l'email est déjà utilisé
+     * @throws CryptoException si le chiffrement du mot de passe échoue
      */
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(
@@ -40,8 +51,13 @@ public class AuthController {
     }
 
     /**
-     * Génère un nonce de challenge pour le login HMAC.
-     * GET /api/auth/challenge?email=...
+     * Génère un nonce UUID pour initier le protocole HMAC.
+     *
+     * <p>Le client doit inclure ce nonce dans le calcul du HMAC lors du login.
+     * Le nonce est à usage unique — toute réutilisation est rejetée.</p>
+     *
+     * @param email l'email de l'utilisateur souhaitant se connecter
+     * @return 200 avec {@code { "nonce": "<uuid>" }}
      */
     @GetMapping("/challenge")
     public ResponseEntity<Map<String, String>> challenge(@RequestParam String email) {
@@ -50,9 +66,11 @@ public class AuthController {
     }
 
     /**
-     * Login fort HMAC.
-     * POST /api/auth/login
-     * Body: { email, nonce, timestamp, hmac }
+     * Authentifie un utilisateur via le protocole HMAC et retourne un JWT.
+     *
+     * @param request payload contenant {@code email}, {@code nonce}, {@code timestamp}, {@code hmac}
+     * @return 200 avec {@link LoginResponse} contenant le JWT, 401 si l'authentification échoue
+     * @throws CryptoException si le déchiffrement du mot de passe stocké échoue
      */
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) throws CryptoException {
