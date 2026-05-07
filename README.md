@@ -1,160 +1,101 @@
-# SkillHub — Plateforme de formation en ligne
+# SkillHub
 
-Architecture microservices : Laravel (API) + Spring Boot (Auth SSO) + React (Frontend)
-
----
-
-# SkillHub — Plateforme de formation en ligne
-
-Lien du repository : https://github.com/Mahery23/skillhub-examen
+Plateforme web de formations en ligne. Les formateurs publient des cours, les apprenants s'y inscrivent.
 
 ---
 
-## Architecture microservices
-┌─────────────────┐        ┌──────────────────────┐
-│  React Frontend │──────▶│   Laravel API :8000   │
-│    :5173        │        │  (formations, modules,│
-└─────────────────┘        │   inscriptions...)    │
-└──────────┬────────────┘
-│ HTTP REST
-┌──────────▼────────────┐
-│  Auth Service :8080    │
-│  Spring Boot           │
-│  (HMAC + JWT + AES)    │
-└──────────┬────────────┘
-│
-┌─────────────────▼──────────────────┐
-│           MySQL :3306               │
-│  skillhub_db (Laravel)              │
-│  authdb      (Spring Boot)          │
-└────────────────────────────────────┘
+## Architecture
 
-
-**Pourquoi cette architecture ?**
-Séparer l'authentification dans un microservice dédié permet de l'isoler, de la sécuriser indépendamment, et de la réutiliser par d'autres services sans dupliquer la logique de sécurité.
+| Service | Technologie | Port |
+|---|---|---|
+| Auth Service | Spring Boot (Java 21) | 8080 |
+| API | Laravel (PHP 8.3) | 8000 |
+| Frontend | React | 5173 |
 
 ---
 
-## Système d'authentification SSO (HMAC + JWT)
+## Prérequis
 
-Le mot de passe ne circule **jamais** sur le réseau. Le protocole fonctionne en 3 étapes :
-
-Client  →  GET  /api/challenge?email=...
-←  { nonce: "uuid" }
-Client calcule localement :
-message = email:nonce:timestamp
-hmac    = HMAC-SHA256(password, message)
-Client  →  POST /api/login { email, nonce, timestamp, hmac }
-←  { accessToken: "JWT...", expiresAt: 1234567890 }
-
-
-**Côté Laravel :**
-- `AuthController.php` transmet la requête au auth-service via HTTP REST
-- Le middleware `VerifySpringJWT.php` valide le JWT Spring Boot sur chaque route protégée
-- Le JWT contient : `email`, `role`, `name` — injectés dans la requête via `$request->attributes`
-
-**Côté Spring Boot :**
-- Les mots de passe sont chiffrés en **AES-256-GCM** avec la `APP_MASTER_KEY`
-- Le nonce est stocké en base pour éviter les attaques par rejeu
-- La fenêtre de validité du timestamp est de ±60 secondes
-- Le JWT est signé en **HS256** avec le `JWT_SECRET` partagé avec Laravel
+- Java 21, Maven
+- PHP 8.3, Composer
+- Node.js 20+
+- XAMPP (MySQL + Apache)
 
 ---
 
-## Règle métier — Limite d'inscriptions (Question 1)
+## Installation
 
-**Problème identifié :** des apprenants s'inscrivaient à un nombre illimité de formations sans les suivre, saturant les ressources.
-
-**Solution implémentée :** un apprenant ne peut pas s'inscrire à plus de **5 formations simultanément**.
-
-**Endpoint modifié :** `POST /api/formations/{id}/inscription`
-
-**Comportement :**
-- Si l'apprenant a < 5 inscriptions actives → inscription acceptée → `HTTP 201`
-- Si l'apprenant a déjà 5 inscriptions → refus → `HTTP 400` avec message explicite
-
-**Test correspondant :**
-Tests\Feature\EnrollmentTest::test_apprenant_cannot_enroll_in_more_than_5_formations
-
----
-
-## Installation et lancement
-
-### Prérequis
-- Docker Desktop
-- Git
-
-### 1. Cloner le projet
+**1. Cloner le projet**
 ```bash
-git clone https://github.com/Mahery23/skillhub-examen.git
-cd skillhub-examen
+git clone https://github.com/Mahery23/skillhub-ec09.git
+cd skillhub-ec09
 ```
 
-### 2. Configurer les variables d'environnement
+**2. Base de données**
+
+Lancer XAMPP puis créer deux bases dans phpMyAdmin : `authdb` et `skillhub_db`
+
 ```bash
+cd backend
 cp .env.example .env
+php artisan migrate
 ```
 
-Éditer `.env` et remplir :
-- `JWT_SECRET` — même valeur que `APP_JWT_SECRET`
-- `APP_MASTER_KEY` — minimum 32 caractères
-- `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`
-- `MONGODB_PASSWORD`
-
-### 3. Lancer la stack complète
+**3. Dépendances**
 ```bash
-docker compose up --build
-```
+# Backend
+cd backend && composer install
 
-### 4. Vérifier
-| URL | Résultat attendu |
-|-----|-----------------|
-| http://localhost:5173 | Frontend React |
-| http://localhost:8000/api/health | `{"status":"ok"}` |
-| http://localhost:8080/actuator/health | `{"status":"UP"}` |
+# Frontend
+cd frontend && npm install
+```
 
 ---
 
-## Outils
+## Lancer le projet
 
-### Docker
-Conteneurise chaque service dans une image isolée. Le `docker-compose.yml` orchestre les 5 services (frontend, api, auth-service, MySQL, MongoDB) avec leurs dépendances et healthchecks.
+Ouvrir **3 terminaux** :
 
-### GitHub Actions
-Pipeline CI/CD automatisé sur chaque push vers `main` et `dev` :
-- **Job 1** — Spring Boot : `mvn verify` + SonarCloud
-- **Job 2** — Laravel : `composer install` + lint + `php artisan test` + React + SonarCloud
-- **Job 3** — Build + push des images Docker vers Docker Hub
+```bash
+# Terminal 1 — Auth Service
+cd auth-service
+set APP_MASTER_KEY=skillhub_master_key_aes_gcm_2026_ec09_32chars
+set JWT_SECRET=skillhub_secret_jwt_2026_examen_ec09_32chars
+mvn spring-boot:run
 
-### SonarCloud
-Analyse la qualité du code des deux projets (Laravel + Spring Boot) à chaque pipeline :
-- Couverture de code (JaCoCo pour Java, pcov pour PHP)
-- Détection de bugs, code smells, vulnérabilités
-- Rapport disponible sur [sonarcloud.io](https://sonarcloud.io/organizations/mahery23)
+# Terminal 2 — Laravel
+cd backend && php artisan serve
+
+# Terminal 3 — React
+cd frontend && npm run dev
+```
+
+Ouvrir **http://localhost:5173**
+
+---
+
+## Tests
+
+```bash
+cd backend && php artisan test      # Laravel (PHPUnit)
+cd frontend && npm run test         # React (Jest)
+cd auth-service && mvn test         # Spring Boot
+```
 
 ---
 
 ## Variables d'environnement
 
-Voir `.env.example` à la racine du projet pour la liste complète.
-
-| Variable | Description |
-|----------|-------------|
-| `JWT_SECRET` | Secret JWT partagé Laravel ↔ Spring Boot |
-| `APP_MASTER_KEY` | Clé AES-GCM chiffrement mots de passe (min 32 chars) |
-| `AUTH_SERVICE_URL` | URL du auth-service (`http://auth-service:8080` en Docker) |
-| `APP_JWT_SECRET` | Même valeur que `JWT_SECRET` (lu par Spring Boot) |
-| `MYSQL_ROOT_PASSWORD` | Mot de passe root MySQL |
-| `MYSQL_PASSWORD` | Mot de passe utilisateur MySQL |
-| `MONGODB_PASSWORD` | Mot de passe MongoDB |
+| Variable | Où | Description |
+|---|---|---|
+| `APP_MASTER_KEY` | auth-service | Clé AES-256 (min. 32 caractères) |
+| `JWT_SECRET` | auth-service + backend/.env | Clé de signature JWT |
+| `AUTH_SERVICE_URL` | backend/.env | URL du auth-service (http://localhost:8080) |
 
 ---
 
-## Analyse qualité SonarCloud — après feature limite-inscription
+## CI/CD
 
-### Plan d'amélioration (sans modification du code)
+Pipeline GitHub Actions sur chaque push → tests + analyse SonarCloud.
 
-1. **Extraire `resolveUserId()` dans un Service dédié** (`EnrollmentService`) pour respecter le principe de responsabilité unique et améliorer la testabilité
-2. **Compléter les tests** de `EnrollmentTest` pour couvrir `destroy` et `mesFormations` et atteindre un meilleur coverage
-3. **Normaliser `utilisateur_id`** : créer une migration pour passer `utilisateur_id` en `string` dans la table `enrollments`, alignée avec l'identifiant SSO (email)
-4. **Spring Boot** : supprimer l'avertissement `MySQL8Dialect deprecated` en retirant `spring.jpa.database-platform` du `application.properties`
+Voir les résultats : **https://sonarcloud.io** → projet `Mahery23_skillhub-ec09`
