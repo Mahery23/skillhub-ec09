@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Formation;
 use App\Models\Module;
+use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,12 +33,12 @@ class ModuleController extends Controller
      */
     public function store(Request $request, Formation $formation): JsonResponse
     {
-        $this->ensureTrainerOwner($formation);
+        $this->ensureTrainerOwner($request, $formation);
 
         $validated = $request->validate([
-            'titre' => ['required', 'string', 'max:255'],
+            'titre'   => ['required', 'string', 'max:255'],
             'contenu' => ['required', 'string'],
-            'ordre' => [
+            'ordre'   => [
                 'required',
                 'integer',
                 'min:1',
@@ -48,16 +49,16 @@ class ModuleController extends Controller
         $module = $formation->modules()->create($validated);
 
         app(ActivityLogService::class)->log('module.created', [
-            'user_id' => auth('api')->id(),
+            'user_email'   => $request->attributes->get('auth_email'),
             'formation_id' => $formation->id,
-            'module_id' => $module->id,
-            'titre' => $module->titre,
-            'ordre' => $module->ordre,
+            'module_id'    => $module->id,
+            'titre'        => $module->titre,
+            'ordre'        => $module->ordre,
         ]);
 
         return response()->json([
             'message' => 'Module created successfully',
-            'module' => $this->formatModule($module),
+            'module'  => $this->formatModule($module),
         ], 201);
     }
 
@@ -67,12 +68,12 @@ class ModuleController extends Controller
     public function update(Request $request, Module $module): JsonResponse
     {
         $formation = $module->formation;
-        $this->ensureTrainerOwner($formation);
+        $this->ensureTrainerOwner($request, $formation);
 
         $validated = $request->validate([
-            'titre' => ['required', 'string', 'max:255'],
+            'titre'   => ['required', 'string', 'max:255'],
             'contenu' => ['required', 'string'],
-            'ordre' => [
+            'ordre'   => [
                 'required',
                 'integer',
                 'min:1',
@@ -85,26 +86,26 @@ class ModuleController extends Controller
         $module->update($validated);
 
         app(ActivityLogService::class)->log('module.updated', [
-            'user_id' => auth('api')->id(),
+            'user_email'   => $request->attributes->get('auth_email'),
             'formation_id' => $formation->id,
-            'module_id' => $module->id,
-            'titre' => $module->titre,
-            'ordre' => $module->ordre,
+            'module_id'    => $module->id,
+            'titre'        => $module->titre,
+            'ordre'        => $module->ordre,
         ]);
 
         return response()->json([
             'message' => 'Module updated successfully',
-            'module' => $this->formatModule($module->refresh()),
+            'module'  => $this->formatModule($module->refresh()),
         ]);
     }
 
     /**
      * Supprime un module si la formation conserve au moins 3 modules.
      */
-    public function destroy(Module $module): JsonResponse
+    public function destroy(Request $request, Module $module): JsonResponse
     {
         $formation = $module->formation;
-        $this->ensureTrainerOwner($formation);
+        $this->ensureTrainerOwner($request, $formation);
 
         if ((int) $formation->modules()->count() <= 3) {
             return response()->json([
@@ -113,11 +114,11 @@ class ModuleController extends Controller
         }
 
         app(ActivityLogService::class)->log('module.deleted', [
-            'user_id' => auth('api')->id(),
+            'user_email'   => $request->attributes->get('auth_email'),
             'formation_id' => $formation->id,
-            'module_id' => $module->id,
-            'titre' => $module->titre,
-            'ordre' => $module->ordre,
+            'module_id'    => $module->id,
+            'titre'        => $module->titre,
+            'ordre'        => $module->ordre,
         ]);
 
         $module->delete();
@@ -130,12 +131,13 @@ class ModuleController extends Controller
     /**
      * Vérifie que l'utilisateur connecté est un formateur propriétaire de la formation.
      */
-    private function ensureTrainerOwner(Formation $formation): void
+    private function ensureTrainerOwner(Request $request, Formation $formation): void
     {
-        $user = auth('api')->user();
+        $email = $request->attributes->get('auth_email');
+        $role  = $request->attributes->get('auth_role');
 
-        abort_unless($user && $user->role === 'formateur', 403, 'Seul un formateur peut gérer les modules.');
-        abort_unless((int) $formation->formateur_id === (int) $user->id, 403, 'Vous ne pouvez gérer que les modules de vos formations.');
+        abort_unless($role === 'formateur', 403, 'Seul un formateur peut gérer les modules.');
+        abort_unless($formation->formateur_id === $email, 403, 'Vous ne pouvez gérer que les modules de vos formations.');
     }
 
     /**
@@ -144,13 +146,12 @@ class ModuleController extends Controller
     private function formatModule(Module $module): array
     {
         return [
-            'id' => $module->id,
-            'titre' => $module->titre,
-            'contenu' => $module->contenu,
+            'id'           => $module->id,
+            'titre'        => $module->titre,
+            'contenu'      => $module->contenu,
             'formation_id' => $module->formation_id,
-            'ordre' => $module->ordre,
+            'ordre'        => $module->ordre,
             'date_creation' => $module->date_creation,
         ];
     }
 }
-

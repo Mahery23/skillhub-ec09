@@ -15,18 +15,18 @@ return new class extends Migration
         Schema::table('formations', function (Blueprint $table) {
             $table->dropForeign(['formateur_id']);
             $table->dropIndex(['formateur_id', 'categorie', 'niveau']);
-            $table->string('formateur_id')->change();
-            $table->index(['formateur_id', 'categorie', 'niveau']);
+            $table->string('formateur_id', 191)->change();
+            $table->index('formateur_id');
         });
     }
 
     public function down(): void
     {
         Schema::table('formations', function (Blueprint $table) {
-            $table->dropIndex(['formateur_id', 'categorie', 'niveau']);
+            $table->dropIndex(['formateur_id']);
             $table->unsignedBigInteger('formateur_id')->change();
             $table->foreign('formateur_id')->references('id')->on('users')->cascadeOnDelete();
-            $table->index(['formateur_id', 'categorie', 'niveau']);
+            $table->index('formateur_id');
         });
     }
 };

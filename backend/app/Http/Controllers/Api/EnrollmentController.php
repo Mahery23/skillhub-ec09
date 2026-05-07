@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Formation;
+use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,11 @@ class EnrollmentController extends Controller
         $email = $request->attributes->get('auth_email');
 
         // Trouver l'id de l'utilisateur par son email
-        $userId = \App\Models\User::where('email', $email)->value('id');
+        $userId = User::where('email', $email)->value('id');
+
+        if (!$userId) {
+            return response()->json(['message' => 'Utilisateur introuvable.'], 404);
+        }
 
         $count = Enrollment::query()
             ->where('utilisateur_id', $userId)
@@ -54,29 +59,6 @@ class EnrollmentController extends Controller
             'progression'    => 0,
         ]);
 
-        if ($count >= self::MAX_ENROLLMENTS) {
-            return response()->json([
-                'message' => 'Vous ne pouvez pas vous inscrire à plus de 5 formations simultanément.',
-            ], 400);
-        }
-
-        $alreadyEnrolled = Enrollment::query()
-            ->where('utilisateur_id', $email)
-            ->where('formation_id', $formation->id)
-            ->exists();
-
-        if ($alreadyEnrolled) {
-            return response()->json([
-                'message' => 'Vous suivez déjà cette formation.',
-            ], 409);
-        }
-
-        $enrollment = Enrollment::create([
-            'utilisateur_id' => $email,
-            'formation_id'   => $formation->id,
-            'progression'    => 0,
-        ]);
-
         app(ActivityLogService::class)->log('enrollment.created', [
             'user_email'    => $email,
             'formation_id'  => $formation->id,
@@ -86,10 +68,10 @@ class EnrollmentController extends Controller
         return response()->json([
             'message'    => 'Enrollment created successfully',
             'enrollment' => [
-                'id'              => $enrollment->id,
-                'utilisateur_id'  => $enrollment->utilisateur_id,
-                'formation_id'    => $enrollment->formation_id,
-                'progression'     => $enrollment->progression,
+                'id'               => $enrollment->id,
+                'utilisateur_id'   => $enrollment->utilisateur_id,
+                'formation_id'     => $enrollment->formation_id,
+                'progression'      => $enrollment->progression,
                 'date_inscription' => $enrollment->date_inscription,
             ],
         ], 201);
@@ -102,8 +84,11 @@ class EnrollmentController extends Controller
     {
         $email = $request->attributes->get('auth_email');
 
+        // Trouver l'id de l'utilisateur par son email
+        $userId = User::where('email', $email)->value('id');
+
         $enrollment = Enrollment::query()
-            ->where('utilisateur_id', $email)
+            ->where('utilisateur_id', $userId)
             ->where('formation_id', $formation->id)
             ->first();
 
@@ -133,9 +118,12 @@ class EnrollmentController extends Controller
     {
         $email = $request->attributes->get('auth_email');
 
+        // Trouver l'id de l'utilisateur par son email
+        $userId = User::where('email', $email)->value('id');
+
         $enrollments = Enrollment::query()
             ->with(['formation' => fn ($q) => $q->with('formateur:id,nom')->withCount('inscriptions')])
-            ->where('utilisateur_id', $email)
+            ->where('utilisateur_id', $userId)
             ->orderByDesc('date_inscription')
             ->get();
 
@@ -148,14 +136,14 @@ class EnrollmentController extends Controller
                     'progression'      => $enrollment->progression,
                     'date_inscription' => $enrollment->date_inscription,
                     'formation'        => [
-                        'id'         => $formation?->id,
-                        'titre'      => $formation?->titre,
+                        'id'          => $formation?->id,
+                        'titre'       => $formation?->titre,
                         'description' => $formation?->description,
-                        'niveau'     => $formation?->niveau,
-                        'categorie'  => $formation?->categorie,
-                        'vues'       => $formation?->nombre_de_vues,
-                        'apprenants' => (int) ($formation?->inscriptions_count ?? 0),
-                        'formateur'  => [
+                        'niveau'      => $formation?->niveau,
+                        'categorie'   => $formation?->categorie,
+                        'vues'        => $formation?->nombre_de_vues,
+                        'apprenants'  => (int) ($formation?->inscriptions_count ?? 0),
+                        'formateur'   => [
                             'id'  => $formation?->formateur_id,
                             'nom' => $formation?->formateur?->nom,
                         ],

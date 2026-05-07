@@ -11,7 +11,7 @@ use Firebase\JWT\ExpiredException;
 use Firebase\JWT\SignatureInvalidException;
 
 /**
- * Valide le JWT émis par le auth-service Spring Boot (algorithme HS384).
+ * Valide le JWT émis par le auth-service Spring Boot (algorithme HS256).
  * Injecte email, role et name dans la requête pour les controllers.
  */
 class VerifySpringJWT
@@ -26,8 +26,8 @@ class VerifySpringJWT
 
         try {
             $secret = env('JWT_SECRET');
-            // Spring Boot utilise HS384 par défaut pour les clés longues
-            $decoded = JWT::decode($token, new Key($secret, 'HS384'));
+            // Spring Boot utilise HS256 par défaut pour les clés longues
+            $decoded = JWT::decode($token, new Key($secret, 'HS256'));
         } catch (ExpiredException) {
             return response()->json(['message' => 'Token expiré.'], 401);
         } catch (SignatureInvalidException) {

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Gère l'authentification via le microservice Spring Boot (auth-service).
@@ -45,11 +47,23 @@ class AuthController extends Controller
             'role'     => $request->role,
         ]);
 
-        if ($response['status'] !== 200) {
+        if ($response['status'] !== 200 && $response['status'] !== 201) {
             return response()->json([
                 'message' => $response['body']['message'] ?? 'Erreur lors de l\'inscription.',
             ], $response['status']);
         }
+
+        // Créer l'utilisateur dans skillhub_db également
+        User::firstOrCreate(
+            ['email' => $request->email],
+            [
+                'prenom'   => $request->prenom,
+                'nom'      => $request->nom,
+                'contact'  => $request->contact,
+                'role'     => $request->role,
+                'mot_de_passe' => bcrypt(Str::random(32)),
+            ]
+        );
 
         app(ActivityLogService::class)->log('user.registered', [
             'email' => $request->email,
