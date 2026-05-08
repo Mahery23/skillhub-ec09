@@ -1,7 +1,0 @@
-com.example.authserver
-com.example.authserver.config
-com.example.authserver.controller
-com.example.authserver.dto
-com.example.authserver.entity
-com.example.authserver.repository
-com.example.authserver.service

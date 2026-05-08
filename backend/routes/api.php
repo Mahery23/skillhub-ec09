@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\FormationController;
 use App\Http\Controllers\Api\ModuleController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\RatingController;
 
 // Health check Docker
 Route::get('/health', fn() => response()->json(['status' => 'ok']));
@@ -42,4 +43,5 @@ Route::middleware(['spring.auth:apprenant'])->group(function () {
     Route::post('/formations/{formation}/inscription',   [EnrollmentController::class, 'store']);
     Route::delete('/formations/{formation}/inscription', [EnrollmentController::class, 'destroy']);
     Route::get('/apprenant/formations',                  [EnrollmentController::class, 'mesFormations']);
+    Route::post('/formations/{formation}/noter', [RatingController::class, 'store']);
 });
