@@ -113,7 +113,7 @@ jobs:
         run: npm run test:coverage
 
       # Partie C — Envoi des résultats Laravel + React à SonarCloud
-      # Lit automatiquement sonar-project.properties à la racine
+      # Lit automatiquement sonar-project.properties
       - name: SonarCloud — Laravel + React
         uses: SonarSource/sonarcloud-github-action@master
         env:
