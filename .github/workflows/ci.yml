@@ -2,14 +2,15 @@ name: CI/CD — SkillHub
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, develop, feature/**]
   pull_request:
-    branches: [main, dev]
+    branches: [main, dev, develop]
 
 jobs:
 
   # ─────────────────────────────────────────
-  # JOB 1 — Spring Boot : build + test + sonar
+  # JOB 1 — Auth Service Spring Boot
+  # Partie C : build + tests + analyse SonarCloud
   # ─────────────────────────────────────────
   auth-service:
     name: Auth Service — Build & Test
@@ -17,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Nécessaire pour que SonarCloud analyse tout l'historique git
 
       - uses: actions/setup-java@v4
         with:
@@ -25,12 +26,14 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # Compile, exécute les tests et génère le rapport de couverture
       - name: Install, Test, Coverage
         working-directory: auth-service
         env:
           APP_MASTER_KEY: test_master_key_for_ci_only_32chars
         run: mvn verify -B
 
+      # Partie C — Envoi des résultats à SonarCloud
       - name: SonarCloud — Auth Service
         working-directory: auth-service
         env:
@@ -44,7 +47,9 @@ jobs:
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} -B
 
   # ─────────────────────────────────────────
-  # JOB 2 — Laravel + React : lint + test + sonar
+  # JOB 2 — Laravel + React
+  # Partie B : exécution des tests PHPUnit (notation + liste apprenants)
+  # Partie C : analyse SonarCloud + rapport de couverture
   # ─────────────────────────────────────────
   ci:
     name: Laravel + React — Lint · Test · Sonar
@@ -60,6 +65,7 @@ jobs:
           extensions: pdo, pdo_mysql, zip, bcmath, gd, mongodb-2.2.0
           coverage: pcov
 
+      # Installation des dépendances Laravel
       - name: Install — Composer
         working-directory: ./backend
         run: |
@@ -72,6 +78,10 @@ jobs:
         working-directory: ./backend
         run: ./vendor/bin/phpcs --standard=PSR12 app/ || true
 
+      # Partie B — Tests PHPUnit avec génération du rapport de couverture
+      # Inclut les tests des nouvelles fonctionnalités :
+      # - RatingTest (notation des formations)
+      # - ApprenantListTest (liste des apprenants inscrits)
       - name: Test — Laravel
         working-directory: ./backend
         env:
@@ -102,6 +112,8 @@ jobs:
         working-directory: ./frontend
         run: npm run test:coverage
 
+      # Partie C — Envoi des résultats Laravel + React à SonarCloud
+      # Lit automatiquement sonar-project.properties à la racine
       - name: SonarCloud — Laravel + React
         uses: SonarSource/sonarcloud-github-action@master
         env:
